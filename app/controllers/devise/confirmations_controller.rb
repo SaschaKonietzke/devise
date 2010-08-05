@@ -1,4 +1,4 @@
-class Devise::ConfirmationsController < CMS::LoggedInController
+class Devise::ConfirmationsController < CMS::LoggedOutController
   include Devise::Controllers::InternalHelpers
 
   # GET /resource/confirmation/new

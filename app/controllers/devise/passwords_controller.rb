@@ -1,4 +1,4 @@
-class Devise::PasswordsController < CMS::LoggedInController
+class Devise::PasswordsController < CMS::LoggedOutController
   prepend_before_filter :require_no_authentication
   include Devise::Controllers::InternalHelpers
 

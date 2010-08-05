@@ -1,4 +1,4 @@
-class Devise::SessionsController < CMS::LoggedInController
+class Devise::SessionsController < CMS::LoggedOutController
   prepend_before_filter :require_no_authentication, :only => [ :new, :create ]
   include Devise::Controllers::InternalHelpers
 
