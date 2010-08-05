@@ -1,3 +1,5 @@
+require 'CMS/logged_out_controller'
+
 class Devise::UnlocksController < CMS::LoggedOutController
   prepend_before_filter :ensure_email_as_unlock_strategy
   prepend_before_filter :require_no_authentication
