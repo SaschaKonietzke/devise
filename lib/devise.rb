@@ -1,9 +1,6 @@
 require 'active_support/core_ext/numeric/time'
 require 'active_support/dependencies'
 
-require 'CMS/base_controller'
-require 'CMS/logged_out_controller'
-
 module Devise
   autoload :FailureApp, 'devise/failure_app'
   autoload :PathChecker, 'devise/path_checker'

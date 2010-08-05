@@ -1,3 +1,6 @@
+require 'CMS/base_controller'
+require 'CMS/logged_out_controller'
+
 class Devise::ConfirmationsController < CMS::LoggedOutController
   include Devise::Controllers::InternalHelpers
 
