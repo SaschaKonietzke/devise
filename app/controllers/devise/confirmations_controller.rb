@@ -1,7 +1,7 @@
 require 'cms/base_controller'
 require 'cms/logged_out_controller'
 
-class Devise::ConfirmationsController < CMS::LoggedOutController
+class Devise::ConfirmationsController < Cms::LoggedOutController
   include Devise::Controllers::InternalHelpers
 
   # GET /resource/confirmation/new

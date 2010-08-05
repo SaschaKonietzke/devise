@@ -1,7 +1,7 @@
 require 'cms/base_controller'
 require 'cms/logged_out_controller'
 
-class Devise::PasswordsController < CMS::LoggedOutController
+class Devise::PasswordsController < Cms::LoggedOutController
   prepend_before_filter :require_no_authentication
   include Devise::Controllers::InternalHelpers
 
