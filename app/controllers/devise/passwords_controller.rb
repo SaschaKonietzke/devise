@@ -1,5 +1,3 @@
-require 'CMS/logged_out_controller'
-
 class Devise::PasswordsController < CMS::LoggedOutController
   prepend_before_filter :require_no_authentication
   include Devise::Controllers::InternalHelpers
