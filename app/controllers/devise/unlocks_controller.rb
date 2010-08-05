@@ -1,5 +1,5 @@
-require 'CMS/base_controller'
-require 'CMS/logged_out_controller'
+require 'cms/base_controller'
+require 'cms/logged_out_controller'
 
 class Devise::UnlocksController < CMS::LoggedOutController
   prepend_before_filter :ensure_email_as_unlock_strategy
