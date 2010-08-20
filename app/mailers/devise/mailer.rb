@@ -1,5 +1,8 @@
+require 'url_helper'
+
 class Devise::Mailer < ::ActionMailer::Base
   include Devise::Controllers::ScopedViews
+  helper :url
   attr_reader :devise_mapping, :resource
 
   def confirmation_instructions(record)
