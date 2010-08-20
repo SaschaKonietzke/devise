@@ -1,5 +1,5 @@
 require 'cms/base_controller'
-require 'cms/logged_out/baes_controller'
+require 'cms/logged_out/base_controller'
 
 class Devise::PasswordsController < Cms::LoggedOut::BaseController
   prepend_before_filter :require_no_authentication
