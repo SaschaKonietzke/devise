@@ -1,4 +1,8 @@
-class Devise::RegistrationsController < ApplicationController
+require 'cms/base_controller'
+require 'cms/logged_out/base_controller'
+
+
+class Devise::RegistrationsController < Cms::LoggedOut::BaseController
   prepend_before_filter :require_no_authentication, :only => [ :new, :create, :cancel ]
   prepend_before_filter :authenticate_scope!, :only => [:edit, :update, :destroy]
   include Devise::Controllers::InternalHelpers

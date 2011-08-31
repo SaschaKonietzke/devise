@@ -1,5 +1,8 @@
+require 'url_helper'
+
 class Devise::Mailer < ::ActionMailer::Base
   include Devise::Mailers::Helpers
+  helper :url
 
   def confirmation_instructions(record)
     devise_mail(record, :confirmation_instructions)
