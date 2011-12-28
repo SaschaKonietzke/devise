@@ -7,7 +7,7 @@ class Devise::PasswordsController < Cms::LoggedOut::BaseController
 
   # GET /resource/password/new
   def new
-    build_resource
+    build_resource({})
     render_with_scope :new
   end
 
@@ -15,11 +15,10 @@ class Devise::PasswordsController < Cms::LoggedOut::BaseController
   def create
     self.resource = resource_class.send_reset_password_instructions(params[resource_name])
 
-    if resource.errors.empty?
-      set_flash_message :notice, :send_instructions
-      redirect_to new_session_path(resource_name)
+    if successfully_sent?(resource)
+      respond_with({}, :location => after_sending_reset_password_instructions_path_for(resource_name))
     else
-      render_with_scope :new
+      respond_with_navigational(resource){ render_with_scope :new }
     end
   end
 
@@ -35,10 +34,20 @@ class Devise::PasswordsController < Cms::LoggedOut::BaseController
     self.resource = resource_class.reset_password_by_token(params[resource_name])
 
     if resource.errors.empty?
-      set_flash_message :notice, :updated
-      sign_in_and_redirect(resource_name, resource)
+      flash_message = resource.active_for_authentication? ? :updated : :updated_not_active
+      set_flash_message(:notice, flash_message) if is_navigational_format?
+      sign_in(resource_name, resource)
+      respond_with resource, :location => after_sign_in_path_for(resource)
     else
-      render_with_scope :edit
+      respond_with_navigational(resource){ render_with_scope :edit }
     end
   end
+
+  protected
+
+    # The path used after sending reset password instructions
+    def after_sending_reset_password_instructions_path_for(resource_name)
+      new_session_path(resource_name)
+    end
+
 end

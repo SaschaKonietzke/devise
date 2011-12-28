@@ -18,24 +18,36 @@ module Devise
     #
     # Those helpers are added to your ApplicationController.
     module UrlHelpers
+      def self.remove_helpers!
+        self.instance_methods.map(&:to_s).grep(/_(url|path)$/).each do |method|
+          remove_method method
+        end
+      end
 
-      Devise::ROUTES.values.uniq.each do |module_name|
-        [:path, :url].each do |path_or_url|
-          actions = [ nil, :new_ ]
-          actions << :edit_    if [:password, :registration].include?(module_name)
-          actions << :destroy_ if [:session].include?(module_name)
+      def self.generate_helpers!(routes=nil)
+        routes ||= begin
+          mappings = Devise.mappings.values.map(&:used_helpers).flatten.uniq
+          Devise::URL_HELPERS.slice(*mappings)
+        end
 
-          actions.each do |action|
-            class_eval <<-URL_HELPERS, __FILE__, __LINE__ + 1
-              def #{action}#{module_name}_#{path_or_url}(resource_or_scope, *args)
-                scope = Devise::Mapping.find_scope!(resource_or_scope)
-                send("#{action}\#{scope}_#{module_name}_#{path_or_url}", *args)
-              end
-            URL_HELPERS
+        routes.each do |module_name, actions|
+          [:path, :url].each do |path_or_url|
+            actions.each do |action|
+              action = action ? "#{action}_" : ""
+              method = "#{action}#{module_name}_#{path_or_url}"
+
+              class_eval <<-URL_HELPERS, __FILE__, __LINE__ + 1
+                def #{method}(resource_or_scope, *args)
+                  scope = Devise::Mapping.find_scope!(resource_or_scope)
+                  send("#{action}\#{scope}_#{module_name}_#{path_or_url}", *args)
+                end
+              URL_HELPERS
+            end
           end
         end
       end
 
+      generate_helpers!(Devise::URL_HELPERS)
     end
   end
 end

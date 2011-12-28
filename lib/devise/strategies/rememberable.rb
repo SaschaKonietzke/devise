@@ -6,9 +6,10 @@ module Devise
     # to verify whether there is a cookie with the remember token, and to
     # recreate the user from this cookie if it exists. Must be called *before*
     # authenticatable.
-    class Rememberable < Devise::Strategies::Base
+    class Rememberable < Authenticatable
       # A valid strategy for rememberable needs a remember token in the cookies.
       def valid?
+        @remember_cookie = nil
         remember_cookie.present?
       end
 
@@ -20,7 +21,7 @@ module Devise
 
         if validate(resource)
           success!(resource)
-        else
+        elsif !halted?
           cookies.delete(remember_key)
           pass
         end
@@ -28,14 +29,23 @@ module Devise
 
     private
 
+      def decorate(resource)
+        super
+        resource.extend_remember_period = mapping.to.extend_remember_period if resource.respond_to?(:extend_remember_period=)
+      end
+
+      def remember_me?
+        true
+      end
+
       def remember_key
         "remember_#{scope}_token"
       end
 
-      # Accessor for remember cookie
       def remember_cookie
         @remember_cookie ||= cookies.signed[remember_key]
       end
+
     end
   end
 end

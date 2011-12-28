@@ -3,35 +3,33 @@ module Devise
   # and overwrite the apply_schema method.
   module Schema
 
-    def authenticatable(*args)
-      ActiveSupport::Deprecation.warn "t.authenticatable in migrations is deprecated. Please use t.database_authenticatable instead.", caller
-      database_authenticatable(*args)
-    end
-
-    # Creates email, encrypted_password and password_salt.
+    # Creates encrypted_password, and email when it is used as an authentication
+    # key (default).
     #
     # == Options
     # * :null - When true, allow columns to be null.
-    # * :default - Should be set to "" when :null is false.
+    # * :default - Set to "" when :null is false, unless overridden.
     #
     # == Notes
     # For Datamapper compatibility, we explicitly hardcode the limit for the
     # encrypter password field in 128 characters.
     def database_authenticatable(options={})
       null    = options[:null] || false
-      default = options[:default] || ""
+      default = options.key?(:default) ? options[:default] : ("" if null == false)
+      include_email = !respond_to?(:authentication_keys) || self.authentication_keys.include?(:email)
 
-      if options.delete(:encryptor)
-        ActiveSupport::Deprecation.warn ":encryptor as option is deprecated, simply remove it."
-      end
-
-      apply_devise_schema :email,              String, :null => null, :default => default
+      apply_devise_schema :email,              String, :null => null, :default => default if include_email
       apply_devise_schema :encrypted_password, String, :null => null, :default => default, :limit => 128
-      apply_devise_schema :password_salt,      String, :null => null, :default => default
-    end      
+    end
+
+    # Creates password salt for encryption support when using encryptors other
+    # than the database_authenticable default of bcrypt.
+    def encryptable
+      apply_devise_schema :password_salt, String
+    end
 
     # Creates authentication_token.
-    def token_authenticatable(options={})
+    def token_authenticatable
       apply_devise_schema :authentication_token, String
     end
 
@@ -42,14 +40,23 @@ module Devise
       apply_devise_schema :confirmation_sent_at, DateTime
     end
 
-    # Creates reset_password_token.
-    def recoverable
+    # Creates reset_password_token and reset_password_sent_at.
+    #
+    # == Options
+    # * :reset_within - When true, adds a column that reset passwords within some date
+    def recoverable(options={})
+      use_within = options.fetch(:reset_within, Devise.reset_password_within.present?)
       apply_devise_schema :reset_password_token, String
+      apply_devise_schema :reset_password_sent_at, DateTime if use_within
     end
 
     # Creates remember_token and remember_created_at.
-    def rememberable
-      apply_devise_schema :remember_token,      String
+    #
+    # == Options
+    # * :use_salt - When true, does not create a remember_token and use password_salt instead.
+    def rememberable(options={})
+      use_salt = options.fetch(:use_salt, Devise.use_salt_as_remember_token)
+      apply_devise_schema :remember_token,      String unless use_salt
       apply_devise_schema :remember_created_at, DateTime
     end
 

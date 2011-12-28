@@ -6,18 +6,18 @@ module Devise
     module InternalHelpers #:nodoc:
       extend ActiveSupport::Concern
       include Devise::Controllers::ScopedViews
+      include Devise::Controllers::SharedHelpers
 
       included do
-        unloadable
         helper DeviseHelper
 
-        helpers = %w(resource scope_name resource_name
+        helpers = %w(resource scope_name resource_name signed_in_resource
                      resource_class devise_mapping devise_controller?)
         hide_action *helpers
         helper_method *helpers
 
         prepend_before_filter :is_devise_resource?
-        skip_before_filter *Devise.mappings.keys.map { |m| :"authenticate_#{m}!" }
+        respond_to *Mime::SET.map(&:to_sym) if mimes_for_respond_to.empty?
       end
 
       # Gets the actual resource stored in the instance variable
@@ -36,13 +36,14 @@ module Devise
         devise_mapping.to
       end
 
+      # Returns a signed in resource from session (if one exists)
+      def signed_in_resource
+        warden.authenticate(:scope => resource_name)
+      end
+
       # Attempt to find the mapped route for devise based on request path
       def devise_mapping
-        @devise_mapping ||= begin
-          mapping   = Devise::Mapping.find_by_path(request.path)
-          mapping ||= Devise.mappings[Devise.default_scope] if Devise.use_default_scope
-          mapping
-        end
+        @devise_mapping ||= request.env["devise.mapping"]
       end
 
       # Overwrites devise_controller? to return true
@@ -54,8 +55,24 @@ module Devise
 
       # Checks whether it's a devise mapped resource or not.
       def is_devise_resource? #:nodoc:
-        raise ActionController::UnknownAction unless devise_mapping &&
-          devise_mapping.allowed_controllers.include?(controller_path)
+        unknown_action! <<-MESSAGE unless devise_mapping
+Could not find devise mapping for path #{request.fullpath.inspect}.
+Maybe you forgot to wrap your route inside the scope block? For example:
+
+    devise_scope :user do
+      match "/some/route" => "some_devise_controller"
+    end
+MESSAGE
+      end
+
+      # Returns real navigational formats which are supported by Rails
+      def navigational_formats
+        @navigational_formats ||= Devise.navigational_formats.select{ |format| Mime::EXTENSION_LOOKUP[format.to_s] }
+      end
+
+      def unknown_action!(msg)
+        logger.debug "[Devise] #{msg}" if logger
+        raise ActionController::UnknownAction, msg
       end
 
       # Sets the resource creating an instance variable
@@ -74,7 +91,31 @@ module Devise
       # Example:
       #   before_filter :require_no_authentication, :only => :new
       def require_no_authentication
-        redirect_to after_sign_in_path_for(resource_name) if warden.authenticated?(resource_name)
+        return unless is_navigational_format?
+        no_input = devise_mapping.no_input_strategies
+        args = no_input.dup.push :scope => resource_name
+        if no_input.present? && warden.authenticate?(*args)
+          resource = warden.user(resource_name)
+          flash[:alert] = I18n.t("devise.failure.already_authenticated")
+          redirect_to after_sign_in_path_for(resource)
+        end
+      end
+
+      # Helper for use after calling send_*_instructions methods on a resource.
+      # If we are in paranoid mode, we always act as if the resource was valid
+      # and instructions were sent.
+      def successfully_sent?(resource)
+        notice = if Devise.paranoid
+          resource.errors.clear
+          :send_paranoid_instructions
+        elsif resource.errors.empty?
+          :send_instructions
+        end
+
+        if notice
+          set_flash_message :notice, notice if is_navigational_format?
+          true
+        end
       end
 
       # Sets the flash message with :key, using I18n. By default you are able
@@ -91,13 +132,22 @@ module Devise
       #
       # Please refer to README or en.yml locale file to check what messages are
       # available.
-      def set_flash_message(key, kind)
-        flash[key] = I18n.t(:"#{resource_name}.#{kind}", :resource_name => resource_name,
-                            :scope => [:devise, controller_name.to_sym], :default => kind)
+      def set_flash_message(key, kind, options={}) #:nodoc:
+        options[:scope] = "devise.#{controller_name}"
+        options[:default] = Array(options[:default]).unshift(kind.to_sym)
+        options[:resource_name] = resource_name
+        message = I18n.t("#{resource_name}.#{kind}", options)
+        flash[key] = message if message.present?
       end
 
-      def clean_up_passwords(object)
+      def clean_up_passwords(object) #:nodoc:
         object.clean_up_passwords if object.respond_to?(:clean_up_passwords)
+      end
+
+      def respond_with_navigational(*args, &block)
+        respond_with(*args) do |format|
+          format.any(*navigational_formats, &block)
+        end
       end
     end
   end

@@ -3,28 +3,24 @@ module Devise
     # Confirmable is responsible to verify if an account is already confirmed to
     # sign in, and to send emails with confirmation instructions.
     # Confirmation instructions are sent to the user email after creating a
-    # record, after updating it's email and also when manually requested by
-    # a new confirmation instruction request.
-    # Whenever the user update it's email, his account is automatically unconfirmed,
-    # it means it won't be able to sign in again without confirming the account
-    # again through the email that was sent.
+    # record and when manually requested by a new confirmation instruction request.
     #
-    # Configuration:
+    # == Options
     #
-    #   confirm_within: the time you want the user will have to confirm it's account
-    #                   without blocking his access. When confirm_within is zero, the
-    #                   user won't be able to sign in without confirming. You can
-    #                   use this to let your user access some features of your
-    #                   application without confirming the account, but blocking it
-    #                   after a certain period (ie 7 days). By default confirm_within is
-    #                   zero, it means users always have to confirm to sign in.
+    # Confirmable adds the following options to devise_for:
     #
-    # Examples:
+    #   * +confirm_within+: the time you want to allow the user to access his account
+    #     before confirming it. After this period, the user access is denied. You can
+    #     use this to let your user access some features of your application without
+    #     confirming the account, but blocking it after a certain period (ie 7 days).
+    #     By default confirm_within is zero, it means users always have to confirm to sign in.
+    #
+    # == Examples
     #
     #   User.find(1).confirm!      # returns true unless it's already confirmed
     #   User.find(1).confirmed?    # true/false
     #   User.find(1).send_confirmation_instructions # manually send instructions
-    #   User.find(1).resend_confirmation! # generates a new token and resent it
+    #
     module Confirmable
       extend ActiveSupport::Concern
 
@@ -33,25 +29,25 @@ module Devise
         after_create  :send_confirmation_instructions, :if => :confirmation_required?
       end
 
-      # Confirm a user by setting it's confirmed_at to actual time. If the user
+      # Confirm a user by setting its confirmed_at to actual time. If the user
       # is already confirmed, add en error to email field
       def confirm!
         unless_confirmed do
           self.confirmation_token = nil
-          self.confirmed_at = Time.now
+          self.confirmed_at = Time.now.utc
           save(:validate => false)
         end
       end
 
       # Verifies whether a user is confirmed or not
       def confirmed?
-        persisted? && !confirmed_at.nil?
+        !!confirmed_at
       end
 
       # Send confirmation instructions by email
       def send_confirmation_instructions
-        generate_confirmation_token if self.confirmation_token.nil?
-        ::Devise.mailer.confirmation_instructions(self).deliver
+        generate_confirmation_token! if self.confirmation_token.nil?
+        self.devise_mailer.confirmation_instructions(self).deliver
       end
 
       # Resend confirmation token. This method does not need to generate a new token.
@@ -59,11 +55,11 @@ module Devise
         unless_confirmed { send_confirmation_instructions }
       end
 
-      # Overwrites active? from Devise::Models::Activatable for confirmation
-      # by verifying whether an user is active to sign in or not. If the user
+      # Overwrites active_for_authentication? for confirmation
+      # by verifying whether a user is active to sign in or not. If the user
       # is already confirmed, it should never be blocked. Otherwise we need to
       # calculate if the confirm time has not expired for this user.
-      def active?
+      def active_for_authentication?
         super && (!confirmation_required? || confirmed? || confirmation_period_valid?)
       end
 
@@ -75,21 +71,20 @@ module Devise
       # If you don't want confirmation to be sent on create, neither a code
       # to be generated, call skip_confirmation!
       def skip_confirmation!
-        self.confirmed_at  = Time.now
-        @skip_confirmation = true
+        self.confirmed_at = Time.now.utc
       end
 
       protected
 
         # Callback to overwrite if confirmation is required or not.
         def confirmation_required?
-          !@skip_confirmation
+          !confirmed?
         end
 
         # Checks if the confirmation for the user is within the limit time.
         # We do this by calculating if the difference between today and the
         # confirmation sent date does not exceed the confirm in time configured.
-        # Confirm_in is a model configuration, must always be an integer value.
+        # Confirm_within is a model configuration, must always be an integer value.
         #
         # Example:
         #
@@ -128,18 +123,27 @@ module Devise
           self.confirmation_sent_at = Time.now.utc
         end
 
+        def generate_confirmation_token!
+          generate_confirmation_token && save(:validate => false)
+        end
+
+        def after_password_reset
+          super
+          confirm! unless confirmed?
+        end
+
       module ClassMethods
-        # Attempt to find a user by it's email. If a record is found, send new
+        # Attempt to find a user by its email. If a record is found, send new
         # confirmation instructions to it. If not user is found, returns a new user
         # with an email not found error.
         # Options must contain the user email
         def send_confirmation_instructions(attributes={})
-          confirmable = find_or_initialize_with_error_by(:email, attributes[:email], :not_found)
+          confirmable = find_or_initialize_with_errors(confirmation_keys, attributes, :not_found)
           confirmable.resend_confirmation_token if confirmable.persisted?
           confirmable
         end
 
-        # Find a user by it's confirmation token and try to confirm it.
+        # Find a user by its confirmation token and try to confirm it.
         # If no user is found, returns a new user with an error.
         # If the user is already confirmed, create an error for the user
         # Options must have the confirmation_token
@@ -149,11 +153,12 @@ module Devise
           confirmable
         end
 
+        # Generate a token checking if one does not already exist in the database.
         def confirmation_token
-          Devise.friendly_token
+          generate_token(:confirmation_token)
         end
 
-        Devise::Models.config(self, :confirm_within)
+        Devise::Models.config(self, :confirm_within, :confirmation_keys)
       end
     end
   end

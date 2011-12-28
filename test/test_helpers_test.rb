@@ -4,16 +4,37 @@ class TestHelpersTest < ActionController::TestCase
   tests UsersController
   include Devise::TestHelpers
 
+  class CustomFailureApp < Devise::FailureApp
+    def redirect
+      self.status = 306
+    end
+  end
+  
   test "redirects if attempting to access a page unauthenticated" do
     get :index
     assert_redirected_to new_user_session_path
+    assert_equal "You need to sign in or sign up before continuing.", flash[:alert]
   end
 
-  test "redirects if attempting to access a page with a unconfirmed account" do
+  test "redirects if attempting to access a page with an unconfirmed account" do
     swap Devise, :confirm_within => 0 do
-      sign_in create_user
+      user = create_user
+      assert !user.active_for_authentication?
+
+      sign_in user
       get :index
       assert_redirected_to new_user_session_path
+    end
+  end
+
+  test "returns nil if accessing current_user with an unconfirmed account" do
+    swap Devise, :confirm_within => 0 do
+      user = create_user
+      assert !user.active_for_authentication?
+
+      sign_in user
+      get :accept, :id => user
+      assert_nil assigns(:current_user)
     end
   end
 
@@ -36,6 +57,62 @@ class TestHelpersTest < ActionController::TestCase
     sign_out user
     get :index
     assert_redirected_to new_user_session_path
+  end
+  
+  test "respects custom failure app" do
+    begin
+      Devise.warden_config.failure_app = CustomFailureApp
+      get :index
+      assert_response 306
+    ensure
+      Devise.warden_config.failure_app = Devise::FailureApp
+    end
+  end
+
+  test "defined Warden after_authentication callback should not be called when sign_in is called" do
+    begin
+      Warden::Manager.after_authentication do |user, auth, opts|
+        flunk "callback was called while it should not"
+      end
+
+      user = create_user
+      user.confirm!
+      sign_in user
+    ensure
+      Warden::Manager._after_set_user.pop
+    end
+  end
+
+  test "defined Warden before_logout callback should not be called when sign_out is called" do
+    begin
+      Warden::Manager.before_logout do |user, auth, opts|
+        flunk "callback was called while it should not"
+      end
+      user = create_user
+      user.confirm!
+
+      sign_in user
+      sign_out user
+    ensure
+      Warden::Manager._before_logout.pop
+    end
+  end
+
+  test "before_failure call should work" do
+    begin
+      executed = false
+      Warden::Manager.before_failure do |env,opts|
+        executed = true
+      end
+
+      user = create_user
+      sign_in user
+
+      get :index
+      assert executed
+    ensure
+      Warden::Manager._before_failure.pop
+    end
   end
 
   test "allows to sign in with different users" do

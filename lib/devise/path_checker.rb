@@ -2,12 +2,18 @@ module Devise
   class PathChecker
     include Rails.application.routes.url_helpers
 
+    def self.default_url_options(*args)
+      ApplicationController.default_url_options(*args)
+    end
+
     def initialize(env, scope)
-      @env, @scope = env, scope
+      @current_path = "/#{env["SCRIPT_NAME"]}/#{env["PATH_INFO"]}".squeeze("/")
+      @scope = scope
     end
 
     def signing_out?
-      @env["PATH_INFO"] == send("destroy_#{@scope}_session_path")
+      route = "destroy_#{@scope}_session_path"
+      respond_to?(route) && @current_path == send(route)
     end
   end
 end

@@ -7,3 +7,6 @@ coverage/*
 rdoc/*
 pkg
 log
+test/tmp/*
+Gemfile.lock
+

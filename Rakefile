@@ -1,18 +1,18 @@
 # encoding: UTF-8
 
-require 'rake'
 require 'rake/testtask'
-require 'rake/rdoctask'
-require File.join(File.dirname(__FILE__), 'lib', 'devise', 'version')
+require 'rdoc/task'
 
 desc 'Default: run tests for all ORMs.'
-task :default => :pre_commit
+task :default => :test
 
 desc 'Run Devise tests for all ORMs.'
 task :pre_commit do
   Dir[File.join(File.dirname(__FILE__), 'test', 'orm', '*.rb')].each do |file|
     orm = File.basename(file).split(".").first
-    system "rake test DEVISE_ORM=#{orm}"
+    # "Some day, my son, rake's inner wisdom will reveal itself.  Until then,
+    # take this `system` -- may its brute force protect you well."
+    exit 1 unless system "rake test DEVISE_ORM=#{orm}"
   end
 end
 
@@ -31,25 +31,4 @@ Rake::RDocTask.new(:rdoc) do |rdoc|
   rdoc.options << '--line-numbers' << '--inline-source'
   rdoc.rdoc_files.include('README.rdoc')
   rdoc.rdoc_files.include('lib/**/*.rb')
-end
-
-begin
-  require 'jeweler'
-  Jeweler::Tasks.new do |s|
-    s.name = "devise"
-    s.version = Devise::VERSION.dup
-    s.summary = "Flexible authentication solution for Rails with Warden"
-    s.email = "contact@plataformatec.com.br"
-    s.homepage = "http://github.com/plataformatec/devise"
-    s.description = "Flexible authentication solution for Rails with Warden"
-    s.authors = ['José Valim', 'Carlos Antônio']
-    s.files =  FileList["[A-Z]*", "{app,config,lib}/**/*"]
-    s.extra_rdoc_files = FileList["[A-Z]*"] - %w(Gemfile Rakefile)
-    s.add_dependency("warden", "~> 0.10.7")
-    s.add_dependency("bcrypt-ruby", "~> 2.1.2")
-  end
-
-  Jeweler::GemcutterTasks.new
-rescue LoadError
-  puts "Jeweler, or one of its dependencies, is not available. Install it with: gem install jeweler"
 end

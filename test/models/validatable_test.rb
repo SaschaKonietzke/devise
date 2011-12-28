@@ -1,7 +1,8 @@
+# encoding: UTF-8
 require 'test_helper'
 
 class ValidatableTest < ActiveSupport::TestCase
-  extend Devise::TestSilencer if [:mongoid, :data_mapper,:mongo_mapper].include?(DEVISE_ORM)
+  # extend Devise::TestSilencer if [:mongoid, :data_mapper,:mongo_mapper].include?(DEVISE_ORM)
 
   test 'should require email to be set' do
     user = new_user(:email => nil)
@@ -10,32 +11,38 @@ class ValidatableTest < ActiveSupport::TestCase
     assert_equal 'can\'t be blank', user.errors[:email].join
   end
 
-  test 'should require uniqueness of email, allowing blank' do
+  test 'should require uniqueness of email if email has changed, allowing blank' do
     existing_user = create_user
 
     user = new_user(:email => '')
     assert user.invalid?
-    assert_not_equal 'has already been taken', user.errors[:email].join
+    assert_no_match(/taken/, user.errors[:email].join)
 
     user.email = existing_user.email
     assert user.invalid?
-    assert_equal 'has already been taken', user.errors[:email].join
+    assert_match(/taken/, user.errors[:email].join)
+
+    user.save(:validate => false)
+    assert user.valid?
   end
 
-  test 'should require correct email format, allowing blank' do
+  test 'should require correct email format if email has changed, allowing blank' do
     user = new_user(:email => '')
     assert user.invalid?
     assert_not_equal 'is invalid', user.errors[:email].join
 
-    %w(invalid_email_format email@invalid invalid$character@mail.com other@not 123).each do |email|
+    %w{invalid_email_format 123 $$$ () ☃ bla@bla.}.each do |email|
       user.email = email
       assert user.invalid?, 'should be invalid with email ' << email
       assert_equal 'is invalid', user.errors[:email].join
     end
+
+    user.save(:validate => false)
+    assert user.valid?
   end
 
   test 'should accept valid emails' do
-    %w(a.b.c@example.com test_mail@gmail.com any@any.net email@test.br 123@mail.test).each do |email|
+    %w(a.b.c@example.com test_mail@gmail.com any@any.net email@test.br 123@mail.test 1☃3@mail.test).each do |email|
       user = new_user(:email => email)
       assert user.valid?, 'should be valid with email ' << email
       assert_blank user.errors[:email]
@@ -77,20 +84,27 @@ class ValidatableTest < ActiveSupport::TestCase
     assert_equal 'is too short (minimum is 6 characters)', user.errors[:password].join
   end
 
-  test 'should require a password with maximum of 20 characters long' do
-    user = new_user(:password => 'x'*21, :password_confirmation => 'x'*21)
+  test 'should require a password with maximum of 128 characters long' do
+    user = new_user(:password => 'x'*129, :password_confirmation => 'x'*129)
     assert user.invalid?
-    assert_equal 'is too long (maximum is 20 characters)', user.errors[:password].join
+    assert_equal 'is too long (maximum is 128 characters)', user.errors[:password].join
   end
 
   test 'should not require password length when it\'s not changed' do
     user = create_user.reload
     user.password = user.password_confirmation = nil
     assert user.valid?
-  
+
     user.password_confirmation = 'confirmation'
     assert user.invalid?
     assert_not (user.errors[:password].join =~ /is too long/)
+  end
+
+  test 'should complain about length even if possword is not required' do
+    user = new_user(:password => 'x'*129, :password_confirmation => 'x'*129)
+    user.stubs(:password_required?).returns(false)
+    assert user.invalid?
+    assert_equal 'is too long (maximum is 128 characters)', user.errors[:password].join
   end
 
   test 'shuold not be included in objects with invalid API' do

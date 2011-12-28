@@ -4,7 +4,13 @@ class ConfirmationInstructionsTest < ActionMailer::TestCase
 
   def setup
     setup_mailer
+    Devise.mailer = 'Devise::Mailer'
     Devise.mailer_sender = 'test@example.com'
+  end
+
+  def teardown
+    Devise.mailer = 'Devise::Mailer'
+    Devise.mailer_sender = 'please-change-me@config-initializers-devise.com'
   end
 
   def user
@@ -33,6 +39,15 @@ class ConfirmationInstructionsTest < ActionMailer::TestCase
 
   test 'setup sender from configuration' do
     assert_equal ['test@example.com'], mail.from
+  end
+
+  test 'setup sender from custom mailer defaults' do
+    Devise.mailer = 'Users::Mailer'
+    assert_equal ['custom@example.com'], mail.from
+  end
+
+  test 'setup reply to as copy from sender' do
+    assert_equal ['test@example.com'], mail.reply_to
   end
 
   test 'setup subject from I18n' do
